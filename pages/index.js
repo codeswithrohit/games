@@ -1,118 +1,129 @@
-import Image from 'next/image'
-import { Inter } from 'next/font/google'
+import React, { useState, useEffect } from 'react';
+import { firebase } from '../Firebase/config';
+import { format, parse } from 'date-fns';
 
-const inter = Inter({ subsets: ['latin'] })
+const Index = () => {
+  const [games, setGames] = useState([]);
+  const [results, setResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
-export default function Home() {
+  const [currentDate, setCurrentDate] = useState('');
+  const [filteredResults, setFilteredResults] = useState([]);
+
+  useEffect(() => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // January is 0!
+    const year = today.getFullYear();
+
+    const formattedDate = `${month}-${day}-${year}`;
+    setCurrentDate(formattedDate);
+
+    // Fetch results from Firestore and filter based on the current date
+    const fetchResults = async () => {
+      const snapshot = await firebase.firestore().collection('results').get();
+      const resultsList = snapshot.docs.map((doc) => doc.data());
+      setFilteredResults(resultsList);
+    };
+
+    fetchResults();
+  }, []);
+  console.log(filteredResults)
+
+  useEffect(() => {
+    // Fetch game data from Firestore
+    const fetchGameNames = async () => {
+      const snapshot = await firebase.firestore().collection('games').get();
+      const gameNamesList = snapshot.docs.map(doc => doc.data());
+      // Sort the game names based on the time property
+      gameNamesList.sort((a, b) => {
+        const timeA = parse(a.time, 'HH:mm', new Date());
+        const timeB = parse(b.time, 'HH:mm', new Date());
+        if (timeA < timeB) {
+          return -1;
+        }
+        if (timeA > timeB) {
+          return 1;
+        }
+        return 0;
+      });
+      setGames(gameNamesList);
+      setIsLoading(false);
+    };
+  
+    fetchGameNames();
+  }, []);
+  console.log(games)
+
+ const formatTime = (time) => {
+  try {
+    // Check if the time is a non-empty string
+    if (typeof time !== 'string' || time.trim() === '') {
+      throw new Error('Invalid time value');
+    }
+
+    // Parse the time string into a Date object
+    const parsedTime = parse(time, 'HH:mm', new Date());
+
+    // Check if the parsedTime is a valid Date object
+    if (isNaN(parsedTime.getTime())) {
+      throw new Error('Invalid time value');
+    }
+
+    // Format the time in Indian format with AM/PM
+    const formattedTime = format(parsedTime, 'hh:mm aa');
+
+    console.log('Original time:', time);
+    console.log('Parsed time:', parsedTime);
+    console.log('Formatted time:', formattedTime);
+
+    return formattedTime;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return 'Invalid Time';
+  }
+};
+
   return (
-    <main
-      className={`flex min-h-screen flex-col items-center justify-between p-24 ${inter.className}`}
-    >
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">pages/index.js</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <div className='min-h-screen bg-blue-50 dark:bg-white' >
+      {isLoading ? (
+        // Display loading indicator while isLoading is true
+        <div className='flex justify-center items-center h-screen'>
+          <p className='text-blue-300 font-bold text-5xl bg'>Loading...</p>
         </div>
-      </div>
+      ) : (
+        <div className='border-pink-300
+         grid px-10 py-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-4 sm:grid-cols-3 gap-4' >
+          {games.map((game, index) => {
+            // Check if the formatted date matches the current date
+            const showResult = filteredResults.find(
+              result => format(new Date(result.date), 'MM-dd-yyyy') === currentDate && result.game === game.name
+            );
+            const gameTime = formatTime(game.time);
+  
+            return (
+              <div 
+              key={index}
+              className={`bg-white p-2 rounded-md shadow-md border  border-blue-500 ${index % 2 === 0 ? 'text-blue-900' : 'text-blue-800'}`}
+              // style={{ backgroundImage: `url(https://cdn.pixabay.com/photo/2014/04/02/10/13/whiteboard-303145_1280.png)`, backgroundSize: 'cover' }}
+            >
+                <span className={`w-2 h-2 inline-block rounded-full mr-1 animate-blink`}></span>
+                <div className='flex flex-col'>
+                  <span className='text-xl font-bold text-center'>{game.name}</span>
+                  <span className='text-1xl lg:text-2xl md:text-2xl  mt-2 text-center'>{gameTime}</span>
+                  <button className='text-xl px-3 py-1 mt-2 rounded font-bold mb-6 text-white bg-sky-600'>
+                    {showResult ? showResult.number : '-'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+  
+  
+};
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700/10 after:dark:from-sky-900 after:dark:via-[#0141ff]/40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Discover and deploy boilerplate example Next.js&nbsp;projects.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
-}
+export default Index;

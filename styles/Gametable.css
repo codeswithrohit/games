@@ -1,0 +1,21 @@
+/* GameTable.css */
+
+/* Default styles for larger screens (PC) */
+@media (min-width: 768px) {
+    /* Adjust the table width for larger screens */
+    table {
+      width: 80%;
+      margin: 0 auto;
+    }
+    /* Add any other PC-specific styling here */
+  }
+  
+  /* Mobile styles */
+  @media (max-width: 767px) {
+    /* Adjust the table width for mobile screens */
+    table {
+      width: 100%;
+    }
+    /* Add any other mobile-specific styling here */
+  }
+  
